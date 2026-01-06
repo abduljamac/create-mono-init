@@ -67,6 +67,26 @@ async function bootstrapTurborepo(rootDir: string): Promise<void> {
 	);
 }
 
+async function generateNextWebApp(rootDir: string): Promise<void> {
+	await execa(
+		"pnpm",
+		[
+			"dlx",
+			"create-next-app@latest",
+			"apps/web",
+			"--ts",
+			"--tailwind",
+			"--app",
+			"--use-pnpm",
+			"--skip-install",
+			"--disable-git",
+			"--no-linter",
+			"--yes",
+		],
+		{ cwd: rootDir, stdio: "inherit" },
+	);
+}
+
 /**
  * Normalises create-turbo output into the layout we want for this generator:
  *
@@ -125,9 +145,7 @@ async function normalizeTurborepo(
 	});
 
 	if (plan.kind === "web" || plan.kind === "full") {
-		await fs.copy(templatesPath("web"), path.join(appsDir, "web"), {
-			overwrite: true,
-		});
+		await generateNextWebApp(rootDir);
 	}
 
 	if (plan.kind === "app" || plan.kind === "full") {
