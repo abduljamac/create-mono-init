@@ -1,0 +1,7 @@
+{
+  "name": "web",
+  "private": true,
+  "scripts": {
+    "dev": "node -e \"console.log('web not scaffolded yet (Next.js comes next)')\""
+  }
+}
