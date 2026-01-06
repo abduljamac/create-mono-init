@@ -87,6 +87,126 @@ async function generateNextWebApp(rootDir: string): Promise<void> {
 	);
 }
 
+async function generateExpoApp(rootDir: string): Promise<void> {
+	await execa(
+		"pnpm",
+		[
+			"dlx",
+			"create-expo-app@latest",
+			"apps/app",
+			"--yes",
+			"--no-install",
+			"--template",
+			"blank-typescript",
+		],
+		{ cwd: rootDir, stdio: "inherit" },
+	);
+}
+
+async function setupNativeWindExpo(appDir: string): Promise<void> {
+	// 1) Ensure dependencies (NativeWind docs specify versions for Expo setup)
+	// We patch package.json so the final workspace `pnpm install` pulls these in.
+	const pkgPath = path.join(appDir, "package.json");
+	const pkg = await fs.readJson(pkgPath);
+
+	pkg.dependencies ??= {};
+	pkg.devDependencies ??= {};
+
+	// NativeWind + peer deps per NativeWind Expo install docs
+	// (versions come from their guide).
+	pkg.dependencies["nativewind"] ??= "^4.0.0";
+	pkg.dependencies["react-native-reanimated"] ??= "~3.17.4";
+	pkg.dependencies["react-native-safe-area-context"] ??= "5.4.0";
+	pkg.devDependencies["tailwindcss"] ??= "^3.4.17";
+
+	await fs.writeJson(pkgPath, pkg, { spaces: 2 });
+
+	// 2) tailwind.config.js
+	// NativeWind requires preset + content globs that include files using className
+	await fs.writeFile(
+		path.join(appDir, "tailwind.config.js"),
+		`/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./App.{js,jsx,ts,tsx}",
+    "./components/**/*.{js,jsx,ts,tsx}",
+    "./app/**/*.{js,jsx,ts,tsx}"
+  ],
+  presets: [require("nativewind/preset")],
+  theme: { extend: {} },
+  plugins: [],
+};
+`,
+		"utf8",
+	);
+
+	// 3) global.css (Tailwind directives)
+	await fs.writeFile(
+		path.join(appDir, "global.css"),
+		`@tailwind base;
+@tailwind components;
+@tailwind utilities;
+`,
+		"utf8",
+	);
+
+	// 4) babel.config.js (NativeWind Babel integration)
+	await fs.writeFile(
+		path.join(appDir, "babel.config.js"),
+		`module.exports = function (api) {
+  api.cache(true);
+  return {
+    presets: [
+      ["babel-preset-expo", { jsxImportSource: "nativewind" }],
+      "nativewind/babel",
+    ],
+  };
+};
+`,
+		"utf8",
+	);
+
+	// 5) metro.config.js (NativeWind Metro integration)
+	await fs.writeFile(
+		path.join(appDir, "metro.config.js"),
+		`const { getDefaultConfig } = require("expo/metro-config");
+const { withNativeWind } = require("nativewind/metro");
+
+const config = getDefaultConfig(__dirname);
+
+module.exports = withNativeWind(config, { input: "./global.css" });
+`,
+		"utf8",
+	);
+
+	// 6) app.json tweak: set web bundler to metro (NativeWind doc)
+	const appJsonPath = path.join(appDir, "app.json");
+	if (await fs.pathExists(appJsonPath)) {
+		const appJson = await fs.readJson(appJsonPath);
+		appJson.expo ??= {};
+		appJson.expo.web ??= {};
+		appJson.expo.web.bundler = "metro";
+		await fs.writeJson(appJsonPath, appJson, { spaces: 2 });
+	}
+
+	// 7) nativewind-env.d.ts (TypeScript types for className)
+	await fs.writeFile(
+		path.join(appDir, "nativewind-env.d.ts"),
+		`/// <reference types="nativewind/types" />
+`,
+		"utf8",
+	);
+
+	// 8) Ensure App.tsx imports global.css
+	const appTsxPath = path.join(appDir, "App.tsx");
+	if (await fs.pathExists(appTsxPath)) {
+		const src = await fs.readFile(appTsxPath, "utf8");
+		if (!src.includes('import "./global.css"')) {
+			await fs.writeFile(appTsxPath, `import "./global.css";\n${src}`, "utf8");
+		}
+	}
+}
+
 /**
  * Normalises create-turbo output into the layout we want for this generator:
  *
@@ -149,9 +269,8 @@ async function normalizeTurborepo(
 	}
 
 	if (plan.kind === "app" || plan.kind === "full") {
-		await fs.copy(templatesPath("app"), path.join(appsDir, "app"), {
-			overwrite: true,
-		});
+		await generateExpoApp(rootDir);
+		await setupNativeWindExpo(path.join(rootDir, "apps", "app"));
 	}
 }
 
