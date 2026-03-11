@@ -277,8 +277,8 @@ async function normalizeTurborepo(
 		"utf8",
 	);
 
-	// Patch root package.json: keep whatever create-turbo produced, add Biome scripts + devDependency.
-	await patchRootPackageJson(rootDir);
+	// Patch root package.json: set name/description, add Biome scripts + devDependency.
+	await patchRootPackageJson(rootDir, plan);
 
 	// Replace turbo.json with pipelines matching our apps layout.
 	await patchTurboJson(rootDir);
@@ -376,9 +376,17 @@ async function addSharedDependency(appDir: string): Promise<void> {
 	await fs.writeJson(pkgPath, pkg, { spaces: 2 });
 }
 
-async function patchRootPackageJson(rootDir: string): Promise<void> {
+async function patchRootPackageJson(
+	rootDir: string,
+	plan: ScaffoldPlan,
+): Promise<void> {
 	const rootPkgPath = path.join(rootDir, "package.json");
 	const rootPkg = await fs.readJson(rootPkgPath);
+
+	rootPkg.name = plan.projectName;
+	if (plan.description) {
+		rootPkg.description = plan.description;
+	}
 
 	rootPkg.scripts ??= {};
 	rootPkg.scripts.check ??= "biome check .";

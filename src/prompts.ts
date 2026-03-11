@@ -12,6 +12,7 @@ export type ProjectKind = "web" | "app" | "full";
 
 export type ScaffoldPlan = {
 	projectName: string;
+	description: string;
 	kind: ProjectKind;
 	install: boolean;
 	git: boolean;
@@ -46,6 +47,12 @@ export async function collectPlan(): Promise<ScaffoldPlan> {
 	});
 	bailIfCancelled(rawName);
 
+	const description = await text({
+		message: "Project description:",
+		placeholder: "A brief description of your app",
+	});
+	bailIfCancelled(description);
+
 	const kind = await select<ProjectKind>({
 		message: "What do you want to scaffold?",
 		options: [
@@ -70,6 +77,7 @@ export async function collectPlan(): Promise<ScaffoldPlan> {
 
 	const plan: ScaffoldPlan = {
 		projectName: toSafeFolderName(String(rawName)),
+		description: String(description || ""),
 		kind,
 		install,
 		git,
