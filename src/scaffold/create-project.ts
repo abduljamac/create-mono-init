@@ -66,10 +66,9 @@ async function bootstrapTurborepo(rootDir: string): Promise<void> {
 			],
 			{ cwd: parentDir, stdio: "inherit" },
 		);
-	} catch {
-		throw new Error(
-			"Failed to bootstrap Turborepo. Make sure pnpm is installed and you have network access.",
-		);
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		throw new Error(`Failed to bootstrap Turborepo: ${msg}`);
 	}
 }
 
@@ -92,10 +91,9 @@ async function generateNextWebApp(rootDir: string): Promise<void> {
 			],
 			{ cwd: rootDir, stdio: "inherit" },
 		);
-	} catch {
-		throw new Error(
-			"Failed to scaffold Next.js app. Make sure pnpm is installed and you have network access.",
-		);
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		throw new Error(`Failed to scaffold Next.js app: ${msg}`);
 	}
 }
 
@@ -114,10 +112,9 @@ async function generateExpoApp(rootDir: string): Promise<void> {
 			],
 			{ cwd: rootDir, stdio: "inherit" },
 		);
-	} catch {
-		throw new Error(
-			"Failed to scaffold Expo app. Make sure pnpm is installed and you have network access.",
-		);
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		throw new Error(`Failed to scaffold Expo app: ${msg}`);
 	}
 }
 
@@ -276,6 +273,16 @@ async function normalizeTurborepo(
 		"node-linker=hoisted\nshamefully-hoist=true\nstrict-peer-dependencies=false\n",
 		"utf8",
 	);
+
+	// Copy AGENTS.md and create LLM-specific aliases so all AI tools find the guidelines.
+	await fs.copy(
+		templatesPath("root", "AGENTS.md"),
+		path.join(rootDir, "AGENTS.md"),
+		{ overwrite: true },
+	);
+	const agentsRef = "See AGENTS.md for project guidelines.\n";
+	await fs.writeFile(path.join(rootDir, "CLAUDE.md"), agentsRef, "utf8");
+	await fs.writeFile(path.join(rootDir, "COPILOT.md"), agentsRef, "utf8");
 
 	// Patch root package.json: set name/description, add Biome scripts + devDependency.
 	await patchRootPackageJson(rootDir, plan);

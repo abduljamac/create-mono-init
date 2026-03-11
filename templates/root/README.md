@@ -29,3 +29,7 @@ import type { HelloResponse } from "shared";
 ```
 
 The `shared` package is linked via `"shared": "workspace:*"` in each app's `package.json`, so changes are picked up immediately during development.
+
+## AI/LLM Guidelines
+
+This project includes an `AGENTS.md` file with coding conventions, naming rules, and project structure guidelines. Any AI tool (Claude Code, GitHub Copilot, etc.) will automatically pick these up. Edit `AGENTS.md` to customize how AI assistants write code in this project.

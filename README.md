@@ -37,7 +37,10 @@ my-project/
 ├── turbo.json        # Turborepo pipelines (dev, build, check, format)
 ├── biome.json        # Biome linting & formatting
 ├── pnpm-workspace.yaml
-└── .npmrc
+├── .npmrc
+├── AGENTS.md            # AI/LLM project guidelines (the source of truth)
+├── CLAUDE.md            # Points to AGENTS.md (Claude Code)
+└── COPILOT.md           # Points to AGENTS.md (GitHub Copilot)
 ```
 
 Apps included depend on the project type you choose. The `packages/shared` package is always included — it contains shared TypeScript types (API response shapes, etc.) that keep your API contracts in sync across apps. Import from any app with:
