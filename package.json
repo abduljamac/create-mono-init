@@ -1,10 +1,10 @@
 {
-  "name": "create-mono-init",
-  "version": "0.1.0",
+  "name": "@abduljamac/create-mono-init",
+  "version": "0.1.1",
   "private": false,
   "type": "module",
   "bin": {
-    "create-mono-init": "./dist/index.js"
+    "create-mono-init": "dist/index.js"
   },
   "files": [
     "dist",

@@ -5,7 +5,13 @@ A CLI scaffolding tool that generates opinionated **pnpm + Turborepo** monorepos
 ## Usage
 
 ```bash
-pnpm dlx create-mono-init
+pnpm dlx @abduljamac/create-mono-init
+```
+
+Or with npx:
+
+```bash
+npx @abduljamac/create-mono-init
 ```
 
 You'll be prompted to choose:
@@ -49,4 +55,36 @@ Apps included depend on the project type you choose.
 pnpm install
 pnpm build        # Build the CLI
 pnpm dev          # Watch mode
+```
+
+## Testing locally
+
+After making changes, you can test the CLI locally without publishing to npm:
+
+```bash
+# Build the CLI
+pnpm build
+
+# Run it directly
+node dist/index.js
+
+# Or link it globally so you can run it by name
+pnpm link --global
+create-mono-init
+
+# When done, unlink it
+pnpm unlink --global
+```
+
+## Publishing
+
+Changes on GitHub do **not** auto-publish to npm. To publish a new version:
+
+```bash
+# Bump the version
+npm version patch   # or minor / major
+
+# Build and publish
+pnpm build
+npm publish --access public
 ```

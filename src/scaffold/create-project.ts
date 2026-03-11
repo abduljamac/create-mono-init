@@ -270,9 +270,12 @@ async function normalizeTurborepo(
 		path.join(rootDir, "biome.json"),
 		{ overwrite: true },
 	);
-	await fs.copy(templatesPath("root", ".npmrc"), path.join(rootDir, ".npmrc"), {
-		overwrite: true,
-	});
+	// Write .npmrc inline (npm strips .npmrc from published packages for security).
+	await fs.writeFile(
+		path.join(rootDir, ".npmrc"),
+		"node-linker=hoisted\nshamefully-hoist=true\nstrict-peer-dependencies=false\n",
+		"utf8",
+	);
 
 	// Patch root package.json: keep whatever create-turbo produced, add Biome scripts + devDependency.
 	await patchRootPackageJson(rootDir);
