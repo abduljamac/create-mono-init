@@ -50,57 +50,75 @@ async function bootstrapTurborepo(rootDir: string): Promise<void> {
 		await fs.remove(rootDir);
 	}
 
-	await execa(
-		"pnpm",
-		[
-			"dlx",
-			"create-turbo@latest",
-			dirName,
-			"--example",
-			"with-shell-commands",
-			"--package-manager",
+	try {
+		await execa(
 			"pnpm",
-			"--skip-install",
-			"--skip-transforms",
-		],
-		{ cwd: parentDir, stdio: "inherit" },
-	);
+			[
+				"dlx",
+				"create-turbo@latest",
+				dirName,
+				"--example",
+				"with-shell-commands",
+				"--package-manager",
+				"pnpm",
+				"--skip-install",
+				"--skip-transforms",
+			],
+			{ cwd: parentDir, stdio: "inherit" },
+		);
+	} catch {
+		throw new Error(
+			"Failed to bootstrap Turborepo. Make sure pnpm is installed and you have network access.",
+		);
+	}
 }
 
 async function generateNextWebApp(rootDir: string): Promise<void> {
-	await execa(
-		"pnpm",
-		[
-			"dlx",
-			"create-next-app@latest",
-			"apps/web",
-			"--ts",
-			"--tailwind",
-			"--app",
-			"--use-pnpm",
-			"--skip-install",
-			"--disable-git",
-			"--no-linter",
-			"--yes",
-		],
-		{ cwd: rootDir, stdio: "inherit" },
-	);
+	try {
+		await execa(
+			"pnpm",
+			[
+				"dlx",
+				"create-next-app@latest",
+				"apps/web",
+				"--ts",
+				"--tailwind",
+				"--app",
+				"--use-pnpm",
+				"--skip-install",
+				"--disable-git",
+				"--no-linter",
+				"--yes",
+			],
+			{ cwd: rootDir, stdio: "inherit" },
+		);
+	} catch {
+		throw new Error(
+			"Failed to scaffold Next.js app. Make sure pnpm is installed and you have network access.",
+		);
+	}
 }
 
 async function generateExpoApp(rootDir: string): Promise<void> {
-	await execa(
-		"pnpm",
-		[
-			"dlx",
-			"create-expo-app@latest",
-			"apps/app",
-			"--yes",
-			"--no-install",
-			"--template",
-			"blank-typescript",
-		],
-		{ cwd: rootDir, stdio: "inherit" },
-	);
+	try {
+		await execa(
+			"pnpm",
+			[
+				"dlx",
+				"create-expo-app@latest",
+				"apps/app",
+				"--yes",
+				"--no-install",
+				"--template",
+				"blank-typescript",
+			],
+			{ cwd: rootDir, stdio: "inherit" },
+		);
+	} catch {
+		throw new Error(
+			"Failed to scaffold Expo app. Make sure pnpm is installed and you have network access.",
+		);
+	}
 }
 
 async function setupNativeWindExpo(appDir: string): Promise<void> {
@@ -259,6 +277,9 @@ async function normalizeTurborepo(
 	// Patch root package.json: keep whatever create-turbo produced, add Biome scripts + devDependency.
 	await patchRootPackageJson(rootDir);
 
+	// Replace turbo.json with pipelines matching our apps layout.
+	await patchTurboJson(rootDir);
+
 	// Copy package templates into apps/
 	await fs.copy(templatesPath("api"), path.join(appsDir, "api"), {
 		overwrite: true,
@@ -307,6 +328,32 @@ function templatesPath(...parts: string[]): string {
  * Adds Biome scripts + devDependency to the root package.json, without clobbering Turbo scripts.
  * This keeps formatting/linting consistent across generated repos.
  */
+/**
+ * Writes a turbo.json that matches our apps layout (dev, build, check, format).
+ */
+async function patchTurboJson(rootDir: string): Promise<void> {
+	const turboConfig = {
+		$schema: "https://turbo.build/schema.json",
+		tasks: {
+			build: {
+				dependsOn: ["^build"],
+				outputs: ["dist/**", ".next/**", "!.next/cache/**"],
+			},
+			dev: {
+				cache: false,
+				persistent: true,
+			},
+			check: {
+				dependsOn: ["^build"],
+			},
+			format: {},
+		},
+	};
+	await fs.writeJson(path.join(rootDir, "turbo.json"), turboConfig, {
+		spaces: 2,
+	});
+}
+
 async function patchRootPackageJson(rootDir: string): Promise<void> {
 	const rootPkgPath = path.join(rootDir, "package.json");
 	const rootPkg = await fs.readJson(rootPkgPath);
