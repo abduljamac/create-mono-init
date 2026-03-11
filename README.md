@@ -32,14 +32,19 @@ my-project/
 │   ├── api/          # Express API (TypeScript, tsx watch)
 │   ├── web/          # Next.js (App Router, Tailwind)
 │   └── app/          # Expo (NativeWind / Tailwind)
-├── packages/         # Shared packages
+├── packages/
+│   └── shared/       # Shared TypeScript types across all apps
 ├── turbo.json        # Turborepo pipelines (dev, build, check, format)
 ├── biome.json        # Biome linting & formatting
 ├── pnpm-workspace.yaml
 └── .npmrc
 ```
 
-Apps included depend on the project type you choose.
+Apps included depend on the project type you choose. The `packages/shared` package is always included — it contains shared TypeScript types (API response shapes, etc.) that keep your API contracts in sync across apps. Import from any app with:
+
+```ts
+import type { HelloResponse } from "shared";
+```
 
 ## Stack
 

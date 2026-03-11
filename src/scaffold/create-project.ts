@@ -283,6 +283,11 @@ async function normalizeTurborepo(
 	// Replace turbo.json with pipelines matching our apps layout.
 	await patchTurboJson(rootDir);
 
+	// Copy shared types package into packages/
+	await fs.copy(templatesPath("shared"), path.join(packagesDir, "shared"), {
+		overwrite: true,
+	});
+
 	// Copy package templates into apps/
 	await fs.copy(templatesPath("api"), path.join(appsDir, "api"), {
 		overwrite: true,
@@ -290,11 +295,13 @@ async function normalizeTurborepo(
 
 	if (plan.kind === "web" || plan.kind === "full") {
 		await generateNextWebApp(rootDir);
+		await addSharedDependency(path.join(appsDir, "web"));
 	}
 
 	if (plan.kind === "app" || plan.kind === "full") {
 		await generateExpoApp(rootDir);
 		await setupNativeWindExpo(path.join(rootDir, "apps", "app"));
+		await addSharedDependency(path.join(appsDir, "app"));
 	}
 }
 
@@ -355,6 +362,18 @@ async function patchTurboJson(rootDir: string): Promise<void> {
 	await fs.writeJson(path.join(rootDir, "turbo.json"), turboConfig, {
 		spaces: 2,
 	});
+}
+
+/**
+ * Adds "shared": "workspace:*" to a package's dependencies so it can import shared types.
+ */
+async function addSharedDependency(appDir: string): Promise<void> {
+	const pkgPath = path.join(appDir, "package.json");
+	if (!(await fs.pathExists(pkgPath))) return;
+	const pkg = await fs.readJson(pkgPath);
+	pkg.dependencies ??= {};
+	pkg.dependencies["shared"] = "workspace:*";
+	await fs.writeJson(pkgPath, pkg, { spaces: 2 });
 }
 
 async function patchRootPackageJson(rootDir: string): Promise<void> {
