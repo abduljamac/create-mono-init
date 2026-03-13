@@ -131,6 +131,7 @@ async function setupNativeWindExpo(appDir: string): Promise<void> {
 	// (versions come from their guide).
 	pkg.dependencies["nativewind"] ??= "^4.0.0";
 	pkg.dependencies["react-native-reanimated"] ??= "~3.17.4";
+	pkg.dependencies["react-native-worklets"] ??= "^0.7.4";
 	pkg.dependencies["react-native-safe-area-context"] ??= "5.4.0";
 	pkg.devDependencies["tailwindcss"] ??= "^3.4.17";
 
@@ -175,6 +176,7 @@ module.exports = {
       ["babel-preset-expo", { jsxImportSource: "nativewind" }],
       "nativewind/babel",
     ],
+    plugins: ["react-native-reanimated/plugin"],
   };
 };
 `,
