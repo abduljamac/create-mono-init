@@ -26,44 +26,36 @@ This is a pnpm + Turborepo monorepo. All apps live in `apps/` and shared package
 - **Semicolons**: Yes
 - **Imports**: Use `import type` for type-only imports. Biome auto-organizes imports.
 
-## Component Structure (Web & App)
+## Mobile App Folder Structure (`apps/app/`)
 
-Components should be organized by feature, not by type:
+- **`types/`** — TypeScript type definitions and interfaces
+- **`utils/`** — Utility functions and helpers (pure logic, no components)
+- **`hooks/`** — Custom React hooks
+- **`screens/`** — Screen components, organized by feature in subfolders
+- **`components/ui/`** — Shared, reusable UI primitives
+- **`components/<feature>/`** — Feature-specific components
+- **`assets/`** — Images, fonts, and static files
 
-```
-components/
-  auth/
-    login-form.tsx
-    signup-form.tsx
-  dashboard/
-    stats-card.tsx
-    activity-feed.tsx
-  ui/
-    button.tsx
-    input.tsx
-    card.tsx
-```
+Never put type or utility files inside `screens/` or `components/`. They belong in `types/` and `utils/`.
 
-- Keep components small and focused — one component per file
-- Co-locate related files (component, types, utils) in the same folder
-- Shared/reusable UI primitives go in `components/ui/`
+## Web App Folder Structure (`apps/web/`)
+
+- **`types/`** — TypeScript type definitions and interfaces
+- **`utils/`** — Utility functions and helpers (pure logic, no components)
+- **`hooks/`** — Custom React hooks
+- **`app/`** — Next.js App Router pages and layouts
+- **`components/ui/`** — Shared, reusable UI primitives
+- **`components/<feature>/`** — Feature-specific components
+- **`lib/`** — Client-side libraries and configurations
+- **`public/`** — Static assets
+
+Never put type or utility files inside `app/` or `components/`. They belong in `types/` and `utils/`.
 
 ## API Structure
 
-```
-src/
-  routes/
-    health.ts
-    user.ts
-  middleware/
-    auth.ts
-    validate.ts
-  lib/
-    db.ts
-  index.ts
-```
-
-- One route file per resource (e.g., `routes/user.ts`)
+- **`routes/`** — One file per resource
+- **`middleware/`** — Request middleware
+- **`lib/`** — Shared server utilities
 - Use the shared types from `packages/shared` for request/response shapes
 - Keep route handlers thin — business logic goes in separate functions
 
@@ -76,6 +68,14 @@ import type { ApiResponse, UserResponse } from "shared";
 ```
 
 When adding a new API endpoint, always define the response type in `packages/shared/src/api.ts` first.
+
+## Styling
+
+- **Always use Tailwind CSS** for all styling in both web and mobile apps. Never use inline `style={{}}` objects or `StyleSheet.create()`.
+- Mobile app uses NativeWind (Tailwind for React Native). Web app uses Tailwind CSS directly.
+- Use `className` for all layout, spacing, typography, colors, borders, shadows, and sizing.
+- Add design tokens to `tailwind.config.js` `theme.extend` rather than hardcoding hex values in components.
+- For values Tailwind doesn't support natively, use arbitrary values (e.g., `text-[15px]`, `tracking-[-0.5px]`, `leading-[21px]`).
 
 ## General Principles
 
