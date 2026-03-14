@@ -127,13 +127,12 @@ async function setupNativeWindExpo(appDir: string): Promise<void> {
 	pkg.dependencies ??= {};
 	pkg.devDependencies ??= {};
 
-	// NativeWind + peer deps per NativeWind Expo install docs
-	// (versions come from their guide).
-	pkg.dependencies["nativewind"] ??= "^4.0.0";
-	pkg.dependencies["react-native-reanimated"] ??= "~3.17.4";
-	pkg.dependencies["react-native-worklets"] ??= "^0.7.4";
-	pkg.dependencies["react-native-safe-area-context"] ??= "5.4.0";
-	pkg.devDependencies["tailwindcss"] ??= "^3.4.17";
+	// NativeWind + peer deps — use "latest" so projects always start up-to-date.
+	pkg.dependencies["nativewind"] ??= "latest";
+	pkg.dependencies["react-native-reanimated"] ??= "latest";
+	pkg.dependencies["react-native-worklets"] ??= "latest";
+	pkg.dependencies["react-native-safe-area-context"] ??= "latest";
+	pkg.devDependencies["tailwindcss"] ??= "latest";
 
 	await fs.writeJson(pkgPath, pkg, { spaces: 2 });
 
@@ -276,12 +275,8 @@ async function normalizeTurborepo(
 		"utf8",
 	);
 
-	// Copy AGENTS.md and create LLM-specific aliases so all AI tools find the guidelines.
-	await fs.copy(
-		templatesPath("root", "AGENTS.md"),
-		path.join(rootDir, "AGENTS.md"),
-		{ overwrite: true },
-	);
+	// Generate AGENTS.md tailored to the project kind and create LLM-specific aliases.
+	await writeAgentsMd(rootDir, plan);
 	const agentsRef = "See AGENTS.md for project guidelines.\n";
 	await fs.writeFile(path.join(rootDir, "CLAUDE.md"), agentsRef, "utf8");
 	await fs.writeFile(path.join(rootDir, "COPILOT.md"), agentsRef, "utf8");
@@ -435,6 +430,97 @@ This project includes an \`AGENTS.md\` file with coding conventions, naming rule
 	await fs.writeFile(path.join(rootDir, "README.md"), readme, "utf8");
 }
 
+async function writeAgentsMd(
+	rootDir: string,
+	plan: ScaffoldPlan,
+): Promise<void> {
+	const hasWeb = plan.kind === "web" || plan.kind === "full";
+	const hasApp = plan.kind === "app" || plan.kind === "full";
+
+	// Start from the base template.
+	let content = await fs.readFile(
+		templatesPath("root", "AGENTS.md"),
+		"utf8",
+	);
+
+	// Insert the structure listing after the "## Monorepo Structure" paragraph.
+	const structureLines = [`- \`apps/api/\` — Express API server (TypeScript)`];
+	if (hasWeb) structureLines.push(`- \`apps/web/\` — Next.js frontend`);
+	if (hasApp) structureLines.push(`- \`apps/app/\` — Expo mobile app`);
+	structureLines.push(
+		`- \`packages/shared/\` — Shared TypeScript types used across all apps`,
+	);
+
+	content = content.replace(
+		"## Monorepo Structure\n\nThis is a pnpm + Turborepo monorepo. All apps live in `apps/` and shared packages in `packages/`.\n",
+		`## Monorepo Structure\n\nThis is a pnpm + Turborepo monorepo. All apps live in \`apps/\` and shared packages in \`packages/\`.\n\n${structureLines.join("\n")}\n`,
+	);
+
+	// Build kind-specific sections to append before General Principles.
+	const extras: string[] = [];
+
+	if (hasApp) {
+		extras.push(`## Mobile App Folder Structure (\`apps/app/\`)
+
+- **\`types/\`** — TypeScript type definitions and interfaces
+- **\`utils/\`** — Utility functions and helpers (pure logic, no components)
+- **\`hooks/\`** — Custom React hooks
+- **\`screens/\`** — Screen components, organized by feature in subfolders
+- **\`components/ui/\`** — Shared, reusable UI primitives
+- **\`components/<feature>/\`** — Feature-specific components
+- **\`assets/\`** — Images, fonts, and static files
+
+Never put type or utility files inside \`screens/\` or \`components/\`. They belong in \`types/\` and \`utils/\`.`);
+	}
+
+	if (hasWeb) {
+		extras.push(`## Web App Folder Structure (\`apps/web/\`)
+
+- **\`types/\`** — TypeScript type definitions and interfaces
+- **\`utils/\`** — Utility functions and helpers (pure logic, no components)
+- **\`hooks/\`** — Custom React hooks
+- **\`app/\`** — Next.js App Router pages and layouts
+- **\`components/ui/\`** — Shared, reusable UI primitives
+- **\`components/<feature>/\`** — Feature-specific components
+- **\`lib/\`** — Client-side libraries and configurations
+- **\`public/\`** — Static assets
+
+Never put type or utility files inside \`app/\` or \`components/\`. They belong in \`types/\` and \`utils/\`.`);
+	}
+
+	if (hasWeb && hasApp) {
+		extras.push(`## Styling
+
+- **Always use Tailwind CSS** for all styling in both web and mobile apps. Never use inline \`style={{}}\` objects or \`StyleSheet.create()\`.
+- Mobile app uses NativeWind (Tailwind for React Native). Web app uses Tailwind CSS directly.
+- Use \`className\` for all layout, spacing, typography, colors, borders, shadows, and sizing.
+- Add design tokens to \`tailwind.config.js\` \`theme.extend\` rather than hardcoding hex values in components.
+- For values Tailwind doesn't support natively, use arbitrary values (e.g., \`text-[15px]\`, \`tracking-[-0.5px]\`, \`leading-[21px]\`).`);
+	} else if (hasApp) {
+		extras.push(`## Styling
+
+- **Always use Tailwind CSS** via NativeWind for all styling. Never use inline \`style={{}}\` objects or \`StyleSheet.create()\`.
+- Use \`className\` for all layout, spacing, typography, colors, borders, shadows, and sizing.
+- Add design tokens to \`tailwind.config.js\` \`theme.extend\` rather than hardcoding hex values in components.
+- For values Tailwind doesn't support natively, use arbitrary values (e.g., \`text-[15px]\`, \`tracking-[-0.5px]\`, \`leading-[21px]\`).`);
+	} else {
+		extras.push(`## Styling
+
+- **Always use Tailwind CSS** for all styling. Never use inline \`style={{}}\` objects.
+- Use \`className\` for all layout, spacing, typography, colors, borders, shadows, and sizing.
+- Add design tokens to \`tailwind.config.js\` \`theme.extend\` rather than hardcoding hex values in components.
+- For values Tailwind doesn't support natively, use arbitrary values (e.g., \`text-[15px]\`, \`tracking-[-0.5px]\`, \`leading-[21px]\`).`);
+	}
+
+	// Insert kind-specific sections before "## General Principles".
+	content = content.replace(
+		"## General Principles",
+		`${extras.join("\n\n")}\n\n## General Principles`,
+	);
+
+	await fs.writeFile(path.join(rootDir, "AGENTS.md"), content, "utf8");
+}
+
 async function patchRootPackageJson(
 	rootDir: string,
 	plan: ScaffoldPlan,
@@ -452,7 +538,7 @@ async function patchRootPackageJson(
 	rootPkg.scripts.format ??= "biome check . --write";
 
 	rootPkg.devDependencies ??= {};
-	rootPkg.devDependencies["@biomejs/biome"] ??= "^2.3.10";
+	rootPkg.devDependencies["@biomejs/biome"] ??= "latest";
 
 	await fs.writeJson(rootPkgPath, rootPkg, { spaces: 2 });
 }
