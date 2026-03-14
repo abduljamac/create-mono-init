@@ -286,6 +286,9 @@ async function normalizeTurborepo(
 	await fs.writeFile(path.join(rootDir, "CLAUDE.md"), agentsRef, "utf8");
 	await fs.writeFile(path.join(rootDir, "COPILOT.md"), agentsRef, "utf8");
 
+	// Write README.md with the user's project name and description.
+	await writeReadme(rootDir, plan);
+
 	// Patch root package.json: set name/description, add Biome scripts + devDependency.
 	await patchRootPackageJson(rootDir, plan);
 
@@ -383,6 +386,53 @@ async function addSharedDependency(appDir: string): Promise<void> {
 	pkg.dependencies ??= {};
 	pkg.dependencies["shared"] = "workspace:*";
 	await fs.writeJson(pkgPath, pkg, { spaces: 2 });
+}
+
+async function writeReadme(
+	rootDir: string,
+	plan: ScaffoldPlan,
+): Promise<void> {
+	const title = plan.projectName;
+	const descriptionLine = plan.description
+		? `\n${plan.description}\n`
+		: "";
+
+	const readme = `# ${title}
+${descriptionLine}
+## Structure
+
+- \`apps/api/\` — Express API server${plan.kind === "web" || plan.kind === "full" ? "\n- `apps/web/` — Next.js frontend" : ""}${plan.kind === "app" || plan.kind === "full" ? "\n- `apps/app/` — Expo mobile app" : ""}
+- \`packages/shared/\` — Shared TypeScript types used across all apps
+
+## Getting started
+
+\`\`\`bash
+pnpm install
+pnpm dev
+\`\`\`
+
+## Shared types
+
+The \`packages/shared\` package contains shared TypeScript types (API request/response shapes, etc.) that are used by all apps. This keeps your API contracts in sync across the stack.
+
+### Adding a new type
+
+1. Add your type to \`packages/shared/src/api.ts\` (or create a new file)
+2. Export it from \`packages/shared/src/index.ts\`
+3. Import it in any app:
+
+\`\`\`ts
+import type { HelloResponse } from "shared";
+\`\`\`
+
+The \`shared\` package is linked via \`"shared": "workspace:*"\` in each app's \`package.json\`, so changes are picked up immediately during development.
+
+## AI/LLM Guidelines
+
+This project includes an \`AGENTS.md\` file with coding conventions, naming rules, and project structure guidelines. Any AI tool (Claude Code, GitHub Copilot, etc.) will automatically pick these up. Edit \`AGENTS.md\` to customize how AI assistants write code in this project.
+`;
+
+	await fs.writeFile(path.join(rootDir, "README.md"), readme, "utf8");
 }
 
 async function patchRootPackageJson(
