@@ -34,55 +34,81 @@ function bailIfCancelled<T>(value: T): asserts value is Exclude<T, symbol> {
 
 /**
  * Collect user intent for scaffolding.
- * In v1 this returns a plan; later steps will execute the plan (file generation).
+ * Accepts an optional partial plan from CLI flags — prompts are skipped for any
+ * fields that are already provided.
  */
-export async function collectPlan(): Promise<ScaffoldPlan> {
+export async function collectPlan(
+	partial: Partial<ScaffoldPlan> = {},
+): Promise<ScaffoldPlan> {
 	intro("create-mono-init");
 
-	const rawName = await text({
-		message: "Project name (folder):",
-		placeholder: "do-not-stop",
-		validate: (value) =>
-			!value.trim() ? "Project name is required." : undefined,
-	});
-	bailIfCancelled(rawName);
+	let projectName: string;
+	if (partial.projectName) {
+		projectName = toSafeFolderName(partial.projectName);
+	} else {
+		const rawName = await text({
+			message: "Project name (folder):",
+			placeholder: "do-not-stop",
+			validate: (value) =>
+				!value.trim() ? "Project name is required." : undefined,
+		});
+		bailIfCancelled(rawName);
+		projectName = toSafeFolderName(String(rawName));
+	}
 
-	const description = await text({
-		message: "Project description:",
-		placeholder: "A brief description of your app",
-	});
-	bailIfCancelled(description);
+	let description: string;
+	if (partial.description !== undefined) {
+		description = partial.description;
+	} else {
+		const rawDesc = await text({
+			message: "Project description:",
+			placeholder: "A brief description of your app",
+		});
+		bailIfCancelled(rawDesc);
+		description = String(rawDesc || "");
+	}
 
-	const kind = await select<ProjectKind>({
-		message: "What do you want to scaffold?",
-		options: [
-			{ value: "web", label: "Web + API (Next.js + Express)" },
-			{ value: "app", label: "App + API (Expo + Express)" },
-			{ value: "full", label: "Full monorepo (Web + App + API)" },
-		],
-	});
-	bailIfCancelled(kind);
+	let kind: ProjectKind;
+	if (partial.kind) {
+		kind = partial.kind;
+	} else {
+		const rawKind = await select<ProjectKind>({
+			message: "What do you want to scaffold?",
+			options: [
+				{ value: "web", label: "Web + API (Next.js + Express)" },
+				{ value: "app", label: "App + API (Expo + Express)" },
+				{ value: "full", label: "Full monorepo (Web + App + API)" },
+			],
+		});
+		bailIfCancelled(rawKind);
+		kind = rawKind;
+	}
 
-	const install = await confirm({
-		message: "Install dependencies now (pnpm install)?",
-		initialValue: true,
-	});
-	bailIfCancelled(install);
+	let install: boolean;
+	if (partial.install !== undefined) {
+		install = partial.install;
+	} else {
+		const rawInstall = await confirm({
+			message: "Install dependencies now (pnpm install)?",
+			initialValue: true,
+		});
+		bailIfCancelled(rawInstall);
+		install = rawInstall;
+	}
 
-	const git = await confirm({
-		message: "Initialize a git repository?",
-		initialValue: true,
-	});
-	bailIfCancelled(git);
-
-	const plan: ScaffoldPlan = {
-		projectName: toSafeFolderName(String(rawName)),
-		description: String(description || ""),
-		kind,
-		install,
-		git,
-	};
+	let git: boolean;
+	if (partial.git !== undefined) {
+		git = partial.git;
+	} else {
+		const rawGit = await confirm({
+			message: "Initialize a git repository?",
+			initialValue: true,
+		});
+		bailIfCancelled(rawGit);
+		git = rawGit;
+	}
 
 	outro("Plan captured.");
-	return plan;
+
+	return { projectName, description, kind, install, git };
 }

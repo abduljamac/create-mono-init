@@ -303,13 +303,58 @@ async function normalizeTurborepo(
 	if (plan.kind === "web" || plan.kind === "full") {
 		await generateNextWebApp(rootDir);
 		await addSharedDependency(path.join(appsDir, "web"));
+		await addTestingSetup(path.join(appsDir, "web"), "web");
 	}
 
 	if (plan.kind === "app" || plan.kind === "full") {
 		await generateExpoApp(rootDir);
 		await setupNativeWindExpo(path.join(rootDir, "apps", "app"));
 		await addSharedDependency(path.join(appsDir, "app"));
+		await addTestingSetup(path.join(appsDir, "app"), "app");
 	}
+}
+
+/**
+ * Patches a web or app package.json to add vitest and a test script,
+ * then writes a minimal smoke test so `pnpm test` passes from day one.
+ */
+async function addTestingSetup(
+	appDir: string,
+	kind: "web" | "app",
+): Promise<void> {
+	const pkgPath = path.join(appDir, "package.json");
+	if (!(await fs.pathExists(pkgPath))) return;
+
+	const pkg = await fs.readJson(pkgPath);
+	pkg.devDependencies ??= {};
+	pkg.devDependencies["vitest"] ??= "latest";
+	pkg.scripts ??= {};
+	pkg.scripts["test"] ??= "vitest run";
+	pkg.scripts["test:watch"] ??= "vitest";
+	await fs.writeJson(pkgPath, pkg, { spaces: 2 });
+
+	// Write a minimal smoke test so the pipeline has something to run.
+	const testDir = path.join(appDir, "__tests__");
+	await fs.mkdirp(testDir);
+	const testContent =
+		kind === "web"
+			? `import { describe, expect, it } from "vitest";
+
+describe("smoke test", () => {
+  it("passes", () => {
+    expect(true).toBe(true);
+  });
+});
+`
+			: `import { describe, expect, it } from "vitest";
+
+describe("smoke test", () => {
+  it("passes", () => {
+    expect(true).toBe(true);
+  });
+});
+`;
+	await fs.writeFile(path.join(testDir, "smoke.test.ts"), testContent, "utf8");
 }
 
 /**
@@ -360,6 +405,10 @@ async function patchTurboJson(rootDir: string): Promise<void> {
 				cache: false,
 				persistent: true,
 			},
+			test: {},
+			typecheck: {
+				dependsOn: ["^build"],
+			},
 			check: {
 				dependsOn: ["^build"],
 			},
@@ -401,14 +450,24 @@ ${descriptionLine}
 
 ## Getting started
 
-\`\`\`bash
-pnpm install
-pnpm dev
-\`\`\`
+1. Copy \`apps/api/.env.example\` to \`apps/api/.env\` and fill in the values
+2. Run \`pnpm install\`
+3. Run \`pnpm dev\` to start all apps
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| \`pnpm dev\` | Start all apps concurrently |
+| \`pnpm build\` | Build all packages and apps |
+| \`pnpm test\` | Run all tests |
+| \`pnpm typecheck\` | Type-check all packages |
+| \`pnpm check\` | Lint with Biome |
+| \`pnpm format\` | Lint and auto-fix with Biome |
 
 ## Shared types
 
-The \`packages/shared\` package contains shared TypeScript types (API request/response shapes, etc.) that are used by all apps. This keeps your API contracts in sync across the stack.
+The \`packages/shared\` package contains shared TypeScript types (API request/response shapes, etc.) used by all apps.
 
 ### Adding a new type
 
@@ -417,14 +476,12 @@ The \`packages/shared\` package contains shared TypeScript types (API request/re
 3. Import it in any app:
 
 \`\`\`ts
-import type { HelloResponse } from "shared";
+import type { ApiResponse } from "shared";
 \`\`\`
-
-The \`shared\` package is linked via \`"shared": "workspace:*"\` in each app's \`package.json\`, so changes are picked up immediately during development.
 
 ## AI/LLM Guidelines
 
-This project includes an \`AGENTS.md\` file with coding conventions, naming rules, and project structure guidelines. Any AI tool (Claude Code, GitHub Copilot, etc.) will automatically pick these up. Edit \`AGENTS.md\` to customize how AI assistants write code in this project.
+This project includes an \`AGENTS.md\` file with coding conventions, naming rules, and project structure guidelines. Any AI tool will automatically pick these up. Edit \`AGENTS.md\` to customize how AI assistants write code in this project.
 `;
 
 	await fs.writeFile(path.join(rootDir, "README.md"), readme, "utf8");
@@ -466,9 +523,13 @@ async function writeAgentsMd(
 - **\`utils/\`** — Utility functions and helpers (pure logic, no components)
 - **\`hooks/\`** — Custom React hooks
 - **\`screens/\`** — Screen components, organized by feature in subfolders
-- **\`components/ui/\`** — Shared, reusable UI primitives
-- **\`components/<feature>/\`** — Feature-specific components
+- **\`screens/<feature>/components/\`** — Components specific to that screen (co-located)
+- **\`components/\`** — Shared, reusable components used across multiple screens
+- **\`components/ui/\`** — Generic UI primitives (Button, Input — not tied to any screen)
+- **\`services/\`** — API call functions (one file per resource)
+- **\`stores/\`** — Global state (Zustand stores)
 - **\`assets/\`** — Images, fonts, and static files
+- **\`__tests__/\`** — Tests mirroring the source structure
 
 Never put type or utility files inside \`screens/\` or \`components/\`. They belong in \`types/\` and \`utils/\`.`);
 	}
@@ -480,33 +541,58 @@ Never put type or utility files inside \`screens/\` or \`components/\`. They bel
 - **\`utils/\`** — Utility functions and helpers (pure logic, no components)
 - **\`hooks/\`** — Custom React hooks
 - **\`app/\`** — Next.js App Router pages and layouts
-- **\`components/ui/\`** — Shared, reusable UI primitives
-- **\`components/<feature>/\`** — Feature-specific components
+- **\`app/<route>/components/\`** — Components specific to that route (co-located)
+- **\`components/\`** — Shared, reusable components used across multiple routes
+- **\`components/ui/\`** — Generic UI primitives (not tied to any page)
 - **\`lib/\`** — Client-side libraries and configurations
 - **\`public/\`** — Static assets
 
 Never put type or utility files inside \`app/\` or \`components/\`. They belong in \`types/\` and \`utils/\`.`);
 	}
 
+	if (hasWeb || hasApp) {
+		extras.push(`## Screen & Component Decomposition
+
+- **Screens/pages should be thin** — they compose components and hooks, not implement everything inline.
+- **Shared components** (used across multiple screens/pages) go in the top-level \`components/\` folder.
+- **Screen-specific components** live in a \`components/\` folder co-located inside the screen's route directory (e.g., \`screens/profile/components/avatar.tsx\`).
+- **Small, single-use sub-components** can stay inline in the screen file. Move them out only when they grow or get reused elsewhere.`);
+	}
+
+	if (hasWeb || hasApp) {
+		extras.push(`## Custom Hooks
+
+- **Extract reusable logic into custom hooks** when a screen manages non-trivial state, side effects, or API interactions.
+- **Naming**: \`use-<feature>.ts\` in kebab-case (e.g., \`use-auth-flow.ts\`, \`use-form.ts\`).
+- **What belongs in a hook**: form state, API mutation wrappers, derived/computed values, loading state.
+- **What does NOT belong in a hook**: navigation/screen transitions — these stay in the parent component.
+- **Hook categories**:
+  - **Query hooks** — Thin TanStack Query wrappers around service functions (\`useQuery\` / \`useMutation\`).
+  - **Flow hooks** — Compose multiple query hooks with local state to manage a complete user flow.
+- Prefer composing hooks over building monoliths.`);
+	}
+
 	if (hasWeb && hasApp) {
 		extras.push(`## Styling
 
-- **Always use Tailwind CSS** for all styling in both web and mobile apps. Never use inline \`style={{}}\` objects or \`StyleSheet.create()\`.
+- **Always use Tailwind CSS \`className\`** for all styling in both web and mobile apps.
 - Mobile app uses NativeWind (Tailwind for React Native). Web app uses Tailwind CSS directly.
 - Use \`className\` for all layout, spacing, typography, colors, borders, shadows, and sizing.
+- **Inline \`style\` is only acceptable** when Tailwind/NativeWind cannot express the property and it is required (e.g., React Native shadow properties, dynamic prop-driven values like progress bar widths). Always prefer \`className\` first.
 - Add design tokens to \`tailwind.config.js\` \`theme.extend\` rather than hardcoding hex values in components.
 - For values Tailwind doesn't support natively, use arbitrary values (e.g., \`text-[15px]\`, \`tracking-[-0.5px]\`, \`leading-[21px]\`).`);
 	} else if (hasApp) {
 		extras.push(`## Styling
 
-- **Always use Tailwind CSS** via NativeWind for all styling. Never use inline \`style={{}}\` objects or \`StyleSheet.create()\`.
+- **Always use Tailwind CSS \`className\`** via NativeWind for all styling. Never use inline \`style={{}}\` objects or \`StyleSheet.create()\`.
+- **Inline \`style\` is only acceptable** when NativeWind cannot express the property (e.g., React Native shadow properties, dynamic prop-driven values). Always prefer \`className\` first.
 - Use \`className\` for all layout, spacing, typography, colors, borders, shadows, and sizing.
 - Add design tokens to \`tailwind.config.js\` \`theme.extend\` rather than hardcoding hex values in components.
 - For values Tailwind doesn't support natively, use arbitrary values (e.g., \`text-[15px]\`, \`tracking-[-0.5px]\`, \`leading-[21px]\`).`);
 	} else {
 		extras.push(`## Styling
 
-- **Always use Tailwind CSS** for all styling. Never use inline \`style={{}}\` objects.
+- **Always use Tailwind CSS \`className\`** for all styling. Never use inline \`style={{}}\` objects.
 - Use \`className\` for all layout, spacing, typography, colors, borders, shadows, and sizing.
 - Add design tokens to \`tailwind.config.js\` \`theme.extend\` rather than hardcoding hex values in components.
 - For values Tailwind doesn't support natively, use arbitrary values (e.g., \`text-[15px]\`, \`tracking-[-0.5px]\`, \`leading-[21px]\`).`);
@@ -534,6 +620,8 @@ async function patchRootPackageJson(
 	}
 
 	rootPkg.scripts ??= {};
+	rootPkg.scripts.test ??= "turbo test";
+	rootPkg.scripts.typecheck ??= "turbo typecheck";
 	rootPkg.scripts.check ??= "biome check .";
 	rootPkg.scripts.format ??= "biome check . --write";
 
