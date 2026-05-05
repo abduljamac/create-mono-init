@@ -308,8 +308,6 @@ async function normalizeTurborepo(
 		await addTestingSetup(path.join(appsDir, "app"), "app");
 		await writeExpoEnvExample(path.join(appsDir, "app"));
 	}
-
-	await writeRootEnvExample(rootDir, plan);
 }
 
 async function normalizeBarebonesTurborepo(
@@ -335,7 +333,6 @@ async function normalizeBarebonesTurborepo(
 	await patchTurboJson(rootDir);
 	await writeBarebonesAgentFiles(rootDir);
 	await writeBarebonesReadme(rootDir, plan);
-	await writeRootEnvExample(rootDir, plan);
 }
 
 async function writeBarebonesApi(apiDir: string): Promise<void> {
@@ -490,8 +487,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 		"utf8",
 	);
 	await fs.writeFile(
-		path.join(webDir, ".env.local.example"),
-		`# Copy this file to .env.local. Next.js auto-loads .env.local in dev/build.
+		path.join(webDir, ".env.example"),
+		`# Copy this file to .env. Next.js auto-loads .env in dev/build.
 # Vars prefixed with NEXT_PUBLIC_ are exposed to the browser.
 NEXT_PUBLIC_API_URL=http://localhost:3001
 `,
@@ -619,8 +616,8 @@ async function addSharedDependency(appDir: string): Promise<void> {
 
 async function writeWebEnvExample(webDir: string): Promise<void> {
 	await fs.writeFile(
-		path.join(webDir, ".env.local.example"),
-		`# Copy this file to .env.local. Next.js auto-loads .env.local in dev/build.
+		path.join(webDir, ".env.example"),
+		`# Copy this file to .env. Next.js auto-loads .env in dev/build.
 # Vars prefixed with NEXT_PUBLIC_ are exposed to the browser.
 NEXT_PUBLIC_API_URL=http://localhost:4000
 `,
@@ -635,39 +632,6 @@ async function writeExpoEnvExample(appDir: string): Promise<void> {
 # Vars prefixed with EXPO_PUBLIC_ are exposed to the client bundle.
 EXPO_PUBLIC_API_URL=http://localhost:4000
 `,
-		"utf8",
-	);
-}
-
-async function writeRootEnvExample(
-	rootDir: string,
-	plan: ScaffoldPlan,
-): Promise<void> {
-	const apiPort = plan.kind === "barebones" ? "3001" : "4000";
-	const lines = [
-		"# Per-app environment files live next to each app.",
-		"# Copy each example to its real filename before running `pnpm dev`:",
-		"#",
-		`#   apps/api/.env           (from apps/api/.env.example)        — PORT=${apiPort}`,
-	];
-	if (plan.kind !== "app") {
-		lines.push(
-			"#   apps/web/.env.local     (from apps/web/.env.local.example)  — NEXT_PUBLIC_API_URL",
-		);
-	}
-	if (plan.kind === "app" || plan.kind === "full") {
-		lines.push(
-			"#   apps/app/.env           (from apps/app/.env.example)        — EXPO_PUBLIC_API_URL",
-		);
-	}
-	lines.push(
-		"#",
-		"# Add any monorepo-wide variables below (e.g. shared CI tokens).",
-		"",
-	);
-	await fs.writeFile(
-		path.join(rootDir, ".env.example"),
-		`${lines.join("\n")}`,
 		"utf8",
 	);
 }
