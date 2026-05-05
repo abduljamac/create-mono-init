@@ -2,6 +2,24 @@
   "name": "@abduljamac/create-mono-init",
   "version": "0.2.0",
   "private": false,
+  "description": "CLI to scaffold a Turborepo monorepo with API, web, mobile app, and shared packages",
+  "license": "MIT",
+  "author": "abduljamac",
+  "homepage": "https://github.com/abduljamac/create-mono-init#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abduljamac/create-mono-init.git"
+  },
+  "bugs": {
+    "url": "https://github.com/abduljamac/create-mono-init/issues"
+  },
+  "keywords": [
+    "cli",
+    "scaffold",
+    "monorepo",
+    "turborepo",
+    "create"
+  ],
   "type": "module",
   "bin": {
     "create-mono-init": "dist/index.js"
