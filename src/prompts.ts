@@ -8,7 +8,7 @@ import {
 	text,
 } from "@clack/prompts";
 
-export type ProjectKind = "web" | "app" | "full";
+export type ProjectKind = "web" | "app" | "full" | "barebones";
 
 export type ScaffoldPlan = {
 	projectName: string;
@@ -19,9 +19,12 @@ export type ScaffoldPlan = {
 };
 
 function toSafeFolderName(input: string): string {
-	return input
+	return Array.from(input.trim(), (char) =>
+		char.charCodeAt(0) <= 31 ? "-" : char,
+	)
+		.join("")
 		.trim()
-		.replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
+		.replace(/[<>:"/\\|?*]/g, "-")
 		.replace(/\s+/g, "-");
 }
 
@@ -75,6 +78,10 @@ export async function collectPlan(
 		const rawKind = await select<ProjectKind>({
 			message: "What do you want to scaffold?",
 			options: [
+				{
+					value: "barebones",
+					label: "(Barebone) Web + API",
+				},
 				{ value: "web", label: "Web + API (Next.js + Express)" },
 				{ value: "app", label: "App + API (Expo + Express)" },
 				{ value: "full", label: "Full monorepo (Web + App + API)" },

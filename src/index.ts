@@ -10,8 +10,12 @@ function parseCliFlags(): Partial<ScaffoldPlan> {
 		args: process.argv.slice(2),
 		options: {
 			kind: { type: "string" },
+			description: { type: "string" },
+			barebones: { type: "boolean" },
 			install: { type: "boolean" },
+			"no-install": { type: "boolean" },
 			git: { type: "boolean" },
+			"no-git": { type: "boolean" },
 		},
 		allowPositionals: true,
 		strict: false,
@@ -24,16 +28,37 @@ function parseCliFlags(): Partial<ScaffoldPlan> {
 	}
 
 	const kind = values.kind as string | undefined;
-	if (kind === "web" || kind === "app" || kind === "full") {
+	if (
+		kind === "web" ||
+		kind === "app" ||
+		kind === "full" ||
+		kind === "barebones"
+	) {
 		partial.kind = kind as ProjectKind;
+	}
+
+	if (values.barebones) {
+		partial.kind = "barebones";
+	}
+
+	if (values.description !== undefined) {
+		partial.description = values.description as string;
 	}
 
 	if (values.install !== undefined) {
 		partial.install = values.install as boolean;
 	}
 
+	if (values["no-install"]) {
+		partial.install = false;
+	}
+
 	if (values.git !== undefined) {
 		partial.git = values.git as boolean;
+	}
+
+	if (values["no-git"]) {
+		partial.git = false;
 	}
 
 	return partial;

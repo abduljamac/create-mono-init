@@ -1,10 +1,10 @@
+import nodeFs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import fs from "fs-extra";
 import { execa } from "execa";
+import fs from "fs-extra";
 import type { ScaffoldPlan } from "../prompts.js";
-import nodeFs from "node:fs";
 
 /**
  * Creates a new monorepo project in the user's current working directory:
@@ -23,6 +23,11 @@ export async function createProject(plan: ScaffoldPlan): Promise<string> {
 	const rootDir = path.resolve(process.cwd(), plan.projectName);
 
 	await bootstrapTurborepo(rootDir);
+	if (plan.kind === "barebones") {
+		await normalizeBarebonesTurborepo(rootDir, plan);
+		return rootDir;
+	}
+
 	await normalizeTurborepo(rootDir, plan);
 
 	return rootDir;
@@ -62,6 +67,7 @@ async function bootstrapTurborepo(rootDir: string): Promise<void> {
 				"--package-manager",
 				"pnpm",
 				"--skip-install",
+				"--no-git",
 				"--skip-transforms",
 			],
 			{ cwd: parentDir, stdio: "inherit" },
@@ -128,11 +134,11 @@ async function setupNativeWindExpo(appDir: string): Promise<void> {
 	pkg.devDependencies ??= {};
 
 	// NativeWind + peer deps — use "latest" so projects always start up-to-date.
-	pkg.dependencies["nativewind"] ??= "latest";
+	pkg.dependencies.nativewind ??= "latest";
 	pkg.dependencies["react-native-reanimated"] ??= "latest";
 	pkg.dependencies["react-native-worklets"] ??= "latest";
 	pkg.dependencies["react-native-safe-area-context"] ??= "latest";
-	pkg.devDependencies["tailwindcss"] ??= "latest";
+	pkg.devDependencies.tailwindcss ??= "latest";
 
 	await fs.writeJson(pkgPath, pkg, { spaces: 2 });
 
@@ -261,19 +267,7 @@ async function normalizeTurborepo(
 		"utf8",
 	);
 
-	// Copy root-level config files from templates (Biome + npmrc).
-	// These templates are shipped with the generator package.
-	await fs.copy(
-		templatesPath("root", "biome.json"),
-		path.join(rootDir, "biome.json"),
-		{ overwrite: true },
-	);
-	// Write .npmrc inline (npm strips .npmrc from published packages for security).
-	await fs.writeFile(
-		path.join(rootDir, ".npmrc"),
-		"node-linker=hoisted\nshamefully-hoist=true\nstrict-peer-dependencies=false\n",
-		"utf8",
-	);
+	await writeRootToolingFiles(rootDir);
 
 	// Generate AGENTS.md tailored to the project kind and create LLM-specific aliases.
 	await writeAgentsMd(rootDir, plan);
@@ -314,6 +308,176 @@ async function normalizeTurborepo(
 	}
 }
 
+async function normalizeBarebonesTurborepo(
+	rootDir: string,
+	plan: ScaffoldPlan,
+): Promise<void> {
+	const appsDir = path.join(rootDir, "apps");
+	const packagesDir = path.join(rootDir, "packages");
+	const apiDir = path.join(appsDir, "api");
+	const webDir = path.join(appsDir, "web");
+
+	await fs.emptyDir(appsDir);
+	await fs.emptyDir(packagesDir);
+	await fs.writeFile(
+		path.join(rootDir, "pnpm-workspace.yaml"),
+		`packages:\n  - "apps/*"\n  - "packages/*"\n`,
+		"utf8",
+	);
+	await writeRootToolingFiles(rootDir);
+	await writeBarebonesApi(apiDir);
+	await writeBarebonesWeb(webDir);
+	await patchBarebonesPackageJson(rootDir, plan);
+	await patchTurboJson(rootDir);
+	await writeBarebonesAgentFiles(rootDir);
+	await writeBarebonesReadme(rootDir, plan);
+}
+
+async function writeBarebonesApi(apiDir: string): Promise<void> {
+	await fs.mkdirp(path.join(apiDir, "src"));
+	await fs.writeJson(
+		path.join(apiDir, "package.json"),
+		{
+			name: "api",
+			private: true,
+			type: "module",
+			scripts: {
+				dev: "tsx watch src/index.ts",
+				build: "tsc -p tsconfig.json",
+				start: "node dist/index.js",
+			},
+			dependencies: {
+				express: "latest",
+			},
+			devDependencies: {
+				"@types/express": "latest",
+				"@types/node": "latest",
+				tsx: "latest",
+				typescript: "latest",
+			},
+		},
+		{ spaces: 2 },
+	);
+	await fs.writeJson(
+		path.join(apiDir, "tsconfig.json"),
+		{
+			compilerOptions: {
+				target: "ES2022",
+				module: "NodeNext",
+				moduleResolution: "NodeNext",
+				strict: true,
+				esModuleInterop: true,
+				skipLibCheck: true,
+				outDir: "dist",
+				rootDir: "src",
+			},
+			include: ["src"],
+		},
+		{ spaces: 2 },
+	);
+	await fs.writeFile(
+		path.join(apiDir, "src", "index.ts"),
+		`import express from "express";
+
+const app = express();
+const port = Number(process.env.PORT ?? 3001);
+
+app.listen(port, () => {
+  console.log(\`[api] listening on http://localhost:\${port}\`);
+});
+`,
+		"utf8",
+	);
+}
+
+async function writeBarebonesWeb(webDir: string): Promise<void> {
+	await fs.mkdirp(path.join(webDir, "app"));
+	await fs.writeJson(
+		path.join(webDir, "package.json"),
+		{
+			name: "web",
+			private: true,
+			type: "module",
+			scripts: {
+				dev: "next dev",
+				build: "next build",
+				start: "next start",
+			},
+			dependencies: {
+				next: "latest",
+				react: "latest",
+				"react-dom": "latest",
+			},
+			devDependencies: {
+				"@types/node": "latest",
+				"@types/react": "latest",
+				"@types/react-dom": "latest",
+				typescript: "latest",
+			},
+		},
+		{ spaces: 2 },
+	);
+	await fs.writeJson(
+		path.join(webDir, "tsconfig.json"),
+		{
+			compilerOptions: {
+				target: "ES2017",
+				lib: ["dom", "dom.iterable", "esnext"],
+				allowJs: true,
+				skipLibCheck: true,
+				strict: true,
+				noEmit: true,
+				esModuleInterop: true,
+				module: "esnext",
+				moduleResolution: "bundler",
+				resolveJsonModule: true,
+				isolatedModules: true,
+				jsx: "react-jsx",
+				incremental: true,
+				plugins: [{ name: "next" }],
+			},
+			include: [
+				"next-env.d.ts",
+				"**/*.ts",
+				"**/*.tsx",
+				".next/types/**/*.ts",
+				".next/dev/types/**/*.ts",
+			],
+			exclude: ["node_modules"],
+		},
+		{ spaces: 2 },
+	);
+	await fs.writeFile(
+		path.join(webDir, "next-env.d.ts"),
+		`/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+`,
+		"utf8",
+	);
+	await fs.writeFile(
+		path.join(webDir, "app", "layout.tsx"),
+		`import type { ReactNode } from "react";
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+`,
+		"utf8",
+	);
+	await fs.writeFile(
+		path.join(webDir, "app", "page.tsx"),
+		`export default function Page() {
+  return <h1>Hello world</h1>;
+}
+`,
+		"utf8",
+	);
+}
+
 /**
  * Patches a web or app package.json to add vitest and a test script,
  * then writes a minimal smoke test so `pnpm test` passes from day one.
@@ -327,9 +491,9 @@ async function addTestingSetup(
 
 	const pkg = await fs.readJson(pkgPath);
 	pkg.devDependencies ??= {};
-	pkg.devDependencies["vitest"] ??= "latest";
+	pkg.devDependencies.vitest ??= "latest";
 	pkg.scripts ??= {};
-	pkg.scripts["test"] ??= "vitest run";
+	pkg.scripts.test ??= "vitest run";
 	pkg.scripts["test:watch"] ??= "vitest";
 	await fs.writeJson(pkgPath, pkg, { spaces: 2 });
 
@@ -428,18 +592,13 @@ async function addSharedDependency(appDir: string): Promise<void> {
 	if (!(await fs.pathExists(pkgPath))) return;
 	const pkg = await fs.readJson(pkgPath);
 	pkg.dependencies ??= {};
-	pkg.dependencies["shared"] = "workspace:*";
+	pkg.dependencies.shared = "workspace:*";
 	await fs.writeJson(pkgPath, pkg, { spaces: 2 });
 }
 
-async function writeReadme(
-	rootDir: string,
-	plan: ScaffoldPlan,
-): Promise<void> {
+async function writeReadme(rootDir: string, plan: ScaffoldPlan): Promise<void> {
 	const title = plan.projectName;
-	const descriptionLine = plan.description
-		? `\n${plan.description}\n`
-		: "";
+	const descriptionLine = plan.description ? `\n${plan.description}\n` : "";
 
 	const readme = `# ${title}
 ${descriptionLine}
@@ -495,10 +654,7 @@ async function writeAgentsMd(
 	const hasApp = plan.kind === "app" || plan.kind === "full";
 
 	// Start from the base template.
-	let content = await fs.readFile(
-		templatesPath("root", "AGENTS.md"),
-		"utf8",
-	);
+	let content = await fs.readFile(templatesPath("root", "AGENTS.md"), "utf8");
 
 	// Insert the structure listing after the "## Monorepo Structure" paragraph.
 	const structureLines = [`- \`apps/api/\` — Express API server (TypeScript)`];
@@ -629,4 +785,75 @@ async function patchRootPackageJson(
 	rootPkg.devDependencies["@biomejs/biome"] ??= "latest";
 
 	await fs.writeJson(rootPkgPath, rootPkg, { spaces: 2 });
+}
+
+async function patchBarebonesPackageJson(
+	rootDir: string,
+	plan: ScaffoldPlan,
+): Promise<void> {
+	const rootPkgPath = path.join(rootDir, "package.json");
+	const rootPkg = await fs.readJson(rootPkgPath);
+
+	rootPkg.name = plan.projectName;
+	if (plan.description) {
+		rootPkg.description = plan.description;
+	}
+
+	rootPkg.scripts ??= {};
+	rootPkg.scripts.dev ??= "turbo dev";
+	rootPkg.scripts.build ??= "turbo build";
+	rootPkg.scripts.check ??= "biome check .";
+	rootPkg.scripts.format ??= "biome check . --write";
+
+	rootPkg.devDependencies ??= {};
+	rootPkg.devDependencies["@biomejs/biome"] ??= "latest";
+
+	await fs.writeJson(rootPkgPath, rootPkg, { spaces: 2 });
+}
+
+async function writeRootToolingFiles(rootDir: string): Promise<void> {
+	await fs.copy(
+		templatesPath("root", "biome.json"),
+		path.join(rootDir, "biome.json"),
+		{ overwrite: true },
+	);
+	await fs.writeFile(
+		path.join(rootDir, ".npmrc"),
+		"node-linker=hoisted\nshamefully-hoist=true\nstrict-peer-dependencies=false\n",
+		"utf8",
+	);
+}
+
+async function writeBarebonesReadme(
+	rootDir: string,
+	plan: ScaffoldPlan,
+): Promise<void> {
+	const descriptionLine = plan.description ? `\n${plan.description}\n` : "";
+	const readme = `# ${plan.projectName}
+${descriptionLine}
+Barebones pnpm + Turborepo workspace.
+
+## Structure
+
+- \`apps/api/\` — minimal Express API
+- \`apps/web/\` — minimal Next.js web app
+- \`packages/\` — add shared packages here when you need them
+
+## Getting started
+
+1. Run \`pnpm install\`
+2. Add apps or packages
+3. Run \`pnpm dev\`
+`;
+
+	await fs.writeFile(path.join(rootDir, "README.md"), readme, "utf8");
+}
+
+async function writeBarebonesAgentFiles(rootDir: string): Promise<void> {
+	await fs.writeFile(path.join(rootDir, "AGENTS.md"), "", "utf8");
+	await fs.writeFile(
+		path.join(rootDir, "CLAUDE.md"),
+		"See AGENTS.md for project guidelines.\n",
+		"utf8",
+	);
 }
