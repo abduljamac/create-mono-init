@@ -47,7 +47,6 @@ my-project/
 ├── turbo.json        # Turborepo pipelines (dev, build, check, format)
 ├── biome.json        # Biome linting & formatting
 ├── pnpm-workspace.yaml
-├── .npmrc
 ├── AGENTS.md            # AI/LLM project guidelines (the source of truth)
 ├── CLAUDE.md            # Points to AGENTS.md (Claude Code)
 └── COPILOT.md           # Points to AGENTS.md (GitHub Copilot)
@@ -74,7 +73,6 @@ my-project/
 ├── turbo.json
 ├── biome.json
 ├── pnpm-workspace.yaml
-├── .npmrc
 ├── AGENTS.md                # Empty
 └── CLAUDE.md                # Points to AGENTS.md
 ```
@@ -109,7 +107,12 @@ export default function Page() {
 pnpm install
 pnpm build        # Build the CLI
 pnpm dev          # Watch mode
+pnpm validate     # Lint, type-check, test, and build
+pnpm smoke        # Pack and verify every generated project kind
 ```
+
+The project requires Node.js 20.19 or newer and records its pnpm version in
+`package.json` so local development and CI use the same package manager.
 
 ## Testing locally
 
@@ -135,10 +138,15 @@ pnpm unlink --global
 Changes on GitHub do **not** auto-publish to npm. To publish a new version:
 
 ```bash
+# Run every release guard, including package-structure verification
+pnpm release:check
+
 # Bump the version
 npm version patch   # or minor / major
 
-# Build and publish
-pnpm build
+# Publish (prepublishOnly runs the release checks again)
 npm publish --access public
 ```
+
+The local smoke command runs the packaged CLI against all four scaffold modes:
+barebones, web, app, and full.
