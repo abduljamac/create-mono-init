@@ -18,7 +18,7 @@ export type ScaffoldPlan = {
 	git: boolean;
 };
 
-function toSafeFolderName(input: string): string {
+export function toSafeFolderName(input: string): string {
 	return Array.from(input.trim(), (char) =>
 		char.charCodeAt(0) <= 31 ? "-" : char,
 	)
