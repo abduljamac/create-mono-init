@@ -65,11 +65,8 @@ async function normalizeTurborepo(
 
 	await writeRootToolingFiles(rootDir);
 
-	// Generate AGENTS.md tailored to the project kind and create LLM-specific aliases.
+	// Generate AGENTS.md tailored to the project kind.
 	await writeAgentsMd(rootDir, plan);
-	const agentsRef = "See AGENTS.md for project guidelines.\n";
-	await fs.writeFile(path.join(rootDir, "CLAUDE.md"), agentsRef, "utf8");
-	await fs.writeFile(path.join(rootDir, "COPILOT.md"), agentsRef, "utf8");
 
 	// Write README.md with the user's project name and description.
 	await writeReadme(rootDir, plan);
@@ -403,9 +400,4 @@ Barebones pnpm + Turborepo workspace.
 
 async function writeBarebonesAgentFiles(rootDir: string): Promise<void> {
 	await fs.writeFile(path.join(rootDir, "AGENTS.md"), "", "utf8");
-	await fs.writeFile(
-		path.join(rootDir, "CLAUDE.md"),
-		"See AGENTS.md for project guidelines.\n",
-		"utf8",
-	);
 }

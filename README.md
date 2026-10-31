@@ -47,9 +47,7 @@ my-project/
 ├── turbo.json        # Turborepo pipelines (dev, build, check, format)
 ├── biome.json        # Biome linting & formatting
 ├── pnpm-workspace.yaml
-├── AGENTS.md            # AI/LLM project guidelines (the source of truth)
-├── CLAUDE.md            # Points to AGENTS.md (Claude Code)
-└── COPILOT.md           # Points to AGENTS.md (GitHub Copilot)
+└── AGENTS.md            # AI/LLM project guidelines
 ```
 
 Apps included depend on the project type you choose. In the opinionated Web/App/Full modes, the `packages/shared` package is included — it contains shared TypeScript types (API response shapes, etc.) that keep your API contracts in sync across apps. Import from any app with:
@@ -73,15 +71,14 @@ my-project/
 ├── turbo.json
 ├── biome.json
 ├── pnpm-workspace.yaml
-├── AGENTS.md                # Empty
-└── CLAUDE.md                # Points to AGENTS.md
+└── AGENTS.md                # Empty
 ```
 
 The barebone API starts with:
 
 ```ts
 app.listen(port, () => {
-  console.log(`[api] listening on http://localhost:${port}`);
+	console.log(`[api] listening on http://localhost:${port}`);
 });
 ```
 
@@ -89,7 +86,7 @@ The barebone web page starts with:
 
 ```tsx
 export default function Page() {
-  return <h1>Hello world</h1>;
+	return <h1>Hello world</h1>;
 }
 ```
 
@@ -111,7 +108,7 @@ pnpm validate     # Lint, type-check, test, and build
 pnpm smoke        # Pack and verify every generated project kind
 ```
 
-The project requires Node.js 20.19 or newer and records its pnpm version in
+The project requires Node.js 22.12 or newer and records its pnpm version in
 `package.json` so local development and CI use the same package manager.
 
 ## Testing locally

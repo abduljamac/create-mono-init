@@ -54,16 +54,19 @@ When adding a new API endpoint, define the response type in `packages/shared/src
   3. Refactor while keeping tests green.
 
 ### API (`apps/api/`)
+
 - Test route handlers (status codes, response shapes, error cases) using `supertest` against the exported `app`
 - Test service functions for business logic and edge cases
 - Mock external dependencies (databases, third-party APIs) with `vi.mock` / `vi.fn`; keep logic under test real
 
 ### Mobile App (`apps/app/`)
+
 - Test utility functions, custom hooks (state changes, async behavior)
 - Test components with `@testing-library/react-native` (rendering, interactions, conditional UI)
 - Mock navigation, async storage, and native modules
 
 ### General
+
 - Don't test framework internals, third-party behavior, or trivial getters/setters
 
 ## Commands

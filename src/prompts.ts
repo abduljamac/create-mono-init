@@ -53,7 +53,7 @@ export async function collectPlan(
 			message: "Project name (folder):",
 			placeholder: "do-not-stop",
 			validate: (value) =>
-				!value.trim() ? "Project name is required." : undefined,
+				!value?.trim() ? "Project name is required." : undefined,
 		});
 		bailIfCancelled(rawName);
 		projectName = toSafeFolderName(String(rawName));

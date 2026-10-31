@@ -14,7 +14,8 @@ export async function setupNativeWindExpo(appDir: string): Promise<void> {
 	packageJson.dependencies["react-native-reanimated"] ??= "latest";
 	packageJson.dependencies["react-native-worklets"] ??= "latest";
 	packageJson.dependencies["react-native-safe-area-context"] ??= "latest";
-	packageJson.devDependencies.tailwindcss ??= "latest";
+	// NativeWind v4 requires Tailwind CSS v3.
+	packageJson.devDependencies.tailwindcss ??= "^3.4.19";
 
 	await fs.writeJson(packagePath, packageJson, { spaces: 2 });
 

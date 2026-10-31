@@ -1,4 +1,6 @@
+import path from "node:path";
 import { execa } from "execa";
+import fs from "fs-extra";
 import {
 	CREATE_EXPO_APP_VERSION,
 	CREATE_NEXT_APP_VERSION,
@@ -48,4 +50,7 @@ export async function generateExpoApp(rootDir: string): Promise<void> {
 		const message = error instanceof Error ? error.message : String(error);
 		throw new Error(`Failed to scaffold Expo app: ${message}`);
 	}
+
+	// create-expo-app initialises its own repository; the monorepo root owns git.
+	await fs.remove(path.join(rootDir, "apps", "app", ".git"));
 }
